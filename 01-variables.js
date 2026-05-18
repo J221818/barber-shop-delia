@@ -8,9 +8,23 @@ document.addEventListener("DOMContentLoaded", function () {
     const shareUrlInput = document.getElementById("share-url");
     const copyLinkButton = document.getElementById("copy-link-button");
 
+    // Admin panel elements
+    const adminButton = document.getElementById("admin-button");
+    const adminModal = document.getElementById("admin-modal");
+    const closeAdmin = document.getElementById("close-admin");
+    const adminPassword = document.getElementById("admin-password");
+    const adminLogin = document.getElementById("admin-login");
+    const loginSection = document.getElementById("login-section");
+    const dashboardSection = document.getElementById("dashboard-section");
+    const appointmentsBody = document.getElementById("appointments-body");
+    const totalAppointments = document.getElementById("total-appointments");
+    const clearAllBtn = document.getElementById("clear-all-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+
     const pageUrl = window.location.href;
     const whatsappNumber = "529181520732";
     const storageKey = "barberShopDeliaBookedSlots";
+    const adminPassword_correct = "admin123";
 
     if (!form || !confirmation || !errorBox || !whatsappLink || !occupiedList || !qrCode || !shareUrlInput || !copyLinkButton) {
         return;
@@ -192,5 +206,106 @@ document.addEventListener("DOMContentLoaded", function () {
         window.open(whatsappUrl, "_blank");
 
         form.reset();
+    });
+
+    // ==================== ADMIN PANEL ====================
+    
+    adminButton.addEventListener("click", function () {
+        adminModal.classList.add("active");
+        adminPassword.focus();
+    });
+
+    closeAdmin.addEventListener("click", function () {
+        adminModal.classList.remove("active");
+        loginSection.style.display = "grid";
+        dashboardSection.style.display = "none";
+        adminPassword.value = "";
+    });
+
+    adminModal.addEventListener("click", function (event) {
+        if (event.target === adminModal) {
+            adminModal.classList.remove("active");
+            loginSection.style.display = "grid";
+            dashboardSection.style.display = "none";
+            adminPassword.value = "";
+        }
+    });
+
+    adminLogin.addEventListener("click", function () {
+        if (adminPassword.value === adminPassword_correct) {
+            loginSection.style.display = "none";
+            dashboardSection.style.display = "block";
+            loadAdminDashboard();
+        } else {
+            alert("Contraseña incorrecta");
+            adminPassword.value = "";
+            adminPassword.focus();
+        }
+    });
+
+    adminPassword.addEventListener("keypress", function (event) {
+        if (event.key === "Enter") {
+            adminLogin.click();
+        }
+    });
+
+    logoutBtn.addEventListener("click", function () {
+        loginSection.style.display = "grid";
+        dashboardSection.style.display = "none";
+        adminPassword.value = "";
+        adminPassword.focus();
+    });
+
+    function loadAdminDashboard() {
+        const currentBookedSlots = loadBookedSlots();
+        totalAppointments.textContent = currentBookedSlots.length;
+
+        appointmentsBody.innerHTML = "";
+
+        if (currentBookedSlots.length === 0) {
+            const row = document.createElement("tr");
+            row.innerHTML = '<td colspan="7" style="text-align: center; color: #94a3b8;">No hay citas registradas.</td>';
+            appointmentsBody.appendChild(row);
+            return;
+        }
+
+        currentBookedSlots.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+
+        currentBookedSlots.forEach((slot, index) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${slot.clientName}</td>
+                <td>${slot.phone}</td>
+                <td>${slot.date}</td>
+                <td>${slot.time}</td>
+                <td>${slot.service}</td>
+                <td>${slot.notes || '-'}</td>
+                <td><button class="delete-btn" onclick="deleteAppointment(${index})">Eliminar</button></td>
+            `;
+            appointmentsBody.appendChild(row);
+        });
+    }
+
+    window.deleteAppointment = function (index) {
+        if (confirm("¿Estás seguro de que deseas eliminar esta cita?")) {
+            let currentBookedSlots = loadBookedSlots();
+            currentBookedSlots.splice(index, 1);
+            saveBookedSlots.call({ bookedSlots: currentBookedSlots });
+            localStorage.setItem(storageKey, JSON.stringify(currentBookedSlots));
+            renderBookedSlots();
+            loadAdminDashboard();
+        }
+    };
+
+    clearAllBtn.addEventListener("click", function () {
+        if (confirm("⚠️ ¿ESTÁS SEGURO? Esto eliminará TODAS las citas. Esta acción no se puede deshacer.")) {
+            if (confirm("Confirma nuevamente: ¿Deseas eliminar TODAS las citas?")) {
+                localStorage.setItem(storageKey, JSON.stringify([]));
+                bookedSlots = [];
+                renderBookedSlots();
+                loadAdminDashboard();
+                alert("✅ Todas las citas han sido eliminadas.");
+            }
+        }
     });
 });

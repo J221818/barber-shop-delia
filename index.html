@@ -324,6 +324,208 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Admin Panel Styles */
+        .admin-button {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #f59e0b;
+            color: #fff;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            z-index: 999;
+        }
+
+        .admin-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
+        }
+
+        .admin-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .admin-modal.active {
+            display: flex;
+        }
+
+        .admin-content {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 2rem;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 28px 70px rgba(15, 23, 42, 0.2);
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid rgba(15, 23, 42, 0.1);
+            padding-bottom: 1rem;
+        }
+
+        .admin-header h2 {
+            margin: 0;
+            color: #0f172a;
+        }
+
+        .close-admin {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #475569;
+            padding: 0;
+            min-width: auto;
+            flex: none;
+        }
+
+        .close-admin:hover {
+            color: #0f172a;
+        }
+
+        .login-form {
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .login-form input {
+            padding: 0.9rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            font-size: 1rem;
+        }
+
+        .login-form button {
+            padding: 1rem 1.4rem;
+            background: #f59e0b;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .login-form button:hover {
+            background: #d97706;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+        }
+
+        .admin-table thead {
+            background: #f8fafc;
+            border-bottom: 2px solid rgba(15, 23, 42, 0.1);
+        }
+
+        .admin-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .admin-table td {
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            color: #0f172a;
+        }
+
+        .admin-table tbody tr:hover {
+            background: #f8fafc;
+        }
+
+        .delete-btn {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s ease;
+        }
+
+        .delete-btn:hover {
+            background: #dc2626;
+        }
+
+        .admin-actions {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .danger-btn {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 0.85rem 1.2rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: background 0.2s ease;
+        }
+
+        .danger-btn:hover {
+            background: #dc2626;
+        }
+
+        .admin-stats {
+            background: #ecfdf5;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            color: #115e30;
+        }
+
+        @media (max-width: 768px) {
+            .admin-content {
+                padding: 1.5rem;
+            }
+
+            .admin-table {
+                font-size: 0.9rem;
+            }
+
+            .admin-table th,
+            .admin-table td {
+                padding: 0.6rem 0.4rem;
+            }
+
+            .delete-btn {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.75rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -421,6 +623,48 @@
             </div>
         </section>
     </main>
+
+    </main>
+
+    <button class="admin-button" id="admin-button" title="Panel de administrador">⚙️</button>
+
+    <div class="admin-modal" id="admin-modal">
+        <div class="admin-content">
+            <div class="admin-header">
+                <h2>Panel de Administrador</h2>
+                <button class="close-admin" id="close-admin">✕</button>
+            </div>
+            <div id="login-section" class="login-form">
+                <label>Contraseña de administrador:</label>
+                <input type="password" id="admin-password" placeholder="Ingresa la contraseña" />
+                <button type="button" id="admin-login">Acceder</button>
+            </div>
+            <div id="dashboard-section" style="display: none;">
+                <div class="admin-stats">
+                    <strong>Total de citas:</strong> <span id="total-appointments">0</span>
+                </div>
+                <table class="admin-table" id="appointments-table">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Teléfono</th>
+                            <th>Fecha</th>
+                            <th>Hora</th>
+                            <th>Servicio</th>
+                            <th>Notas</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="appointments-body">
+                    </tbody>
+                </table>
+                <div class="admin-actions">
+                    <button class="danger-btn" id="clear-all-btn">Eliminar todas las citas</button>
+                    <button style="background: #0f172a; color: #fff; border: none; padding: 0.85rem 1.2rem; border-radius: 12px; cursor: pointer; font-weight: 700;" id="logout-btn">Cerrar sesión</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <footer>
         <p>Estética Delia &copy; 2026 | Cita en línea disponible ahora</p>
