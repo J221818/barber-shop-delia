@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const copyLinkButton = document.getElementById("copy-link-button");
 
     const pageUrl = window.location.href;
-    const whatsappNumber = "526643593040";
+    const whatsappNumber = "529181520732";
     const storageKey = "barberShopDeliaBookedSlots";
 
     if (!form || !confirmation || !errorBox || !whatsappLink || !occupiedList || !qrCode || !shareUrlInput || !copyLinkButton) {
@@ -182,12 +182,14 @@ document.addEventListener("DOMContentLoaded", function () {
         saveBookedSlots();
         renderBookedSlots();
 
-        confirmation.textContent = `✅ ¡Listo, ${clientName}! Tu cita para ${service} quedó reservada el ${date} a las ${time}.`;
+        confirmation.textContent = `✅ ¡Listo, ${clientName}! Tu cita para ${service} quedó reservada el ${date} a las ${time}. Se abrirá WhatsApp para confirmar la cita.`;
         confirmation.style.display = "block";
 
         const bookingMessage = buildWhatsappMessage(clientName, phone, date, time, service, notes);
-        whatsappLink.href = `https://wa.me/${whatsappNumber}?text=${bookingMessage}`;
+        const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${bookingMessage}`;
+        whatsappLink.href = whatsappUrl;
         whatsappLink.style.display = "inline-flex";
+        window.open(whatsappUrl, "_blank");
 
         form.reset();
     });
