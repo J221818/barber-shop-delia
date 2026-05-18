@@ -7,13 +7,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const qrCode = document.getElementById("qr-code");
     const shareUrlInput = document.getElementById("share-url");
     const copyLinkButton = document.getElementById("copy-link-button");
-    const clearBookingsButton = document.getElementById("clear-bookings-button");
 
     const pageUrl = window.location.href;
     const whatsappNumber = "526643593040";
     const storageKey = "barberShopDeliaBookedSlots";
 
-    if (!form || !confirmation || !errorBox || !whatsappLink || !occupiedList || !qrCode || !shareUrlInput || !copyLinkButton || !clearBookingsButton) {
+    if (!form || !confirmation || !errorBox || !whatsappLink || !occupiedList || !qrCode || !shareUrlInput || !copyLinkButton) {
         return;
     }
 
@@ -21,6 +20,7 @@ document.addEventListener("DOMContentLoaded", function () {
     qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(pageUrl)}`;
 
     let bookedSlots = loadBookedSlots();
+    removeExpiredSlots();
     renderBookedSlots();
 
     function showError(message) {
@@ -88,13 +88,13 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    function clearBookedSlots() {
-        bookedSlots = [];
+    function removeExpiredSlots() {
+        const now = new Date();
+        bookedSlots = bookedSlots.filter(slot => {
+            const slotDate = new Date(slot.date + "T" + slot.time + ":00");
+            return slotDate >= now;
+        });
         saveBookedSlots();
-        renderBookedSlots();
-        confirmation.textContent = "✅ Se han borrado las citas de prueba y el control quedó limpio.";
-        confirmation.style.display = "block";
-        whatsappLink.style.display = "none";
     }
 
     function isSlotTaken(date, time) {
@@ -124,10 +124,6 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (error) {
             showError("No se pudo copiar el enlace. Usa Ctrl+C y pega el enlace manualmente.");
         }
-    });
-
-    clearBookingsButton.addEventListener("click", function () {
-        clearBookedSlots();
     });
 
     form.addEventListener("submit", function (event) {
