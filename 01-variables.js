@@ -7,12 +7,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const qrCode = document.getElementById("qr-code");
     const shareUrlInput = document.getElementById("share-url");
     const copyLinkButton = document.getElementById("copy-link-button");
+    const clearBookingsButton = document.getElementById("clear-bookings-button");
 
     const pageUrl = window.location.href;
     const whatsappNumber = "526643593040";
     const storageKey = "barberShopDeliaBookedSlots";
 
-    if (!form || !confirmation || !errorBox || !whatsappLink || !occupiedList || !qrCode || !shareUrlInput || !copyLinkButton) {
+    if (!form || !confirmation || !errorBox || !whatsappLink || !occupiedList || !qrCode || !shareUrlInput || !copyLinkButton || !clearBookingsButton) {
         return;
     }
 
@@ -87,13 +88,22 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    function clearBookedSlots() {
+        bookedSlots = [];
+        saveBookedSlots();
+        renderBookedSlots();
+        confirmation.textContent = "✅ Se han borrado las citas de prueba y el control quedó limpio.";
+        confirmation.style.display = "block";
+        whatsappLink.style.display = "none";
+    }
+
     function isSlotTaken(date, time) {
         return bookedSlots.some(slot => slot.key === getSlotKey(date, time));
     }
 
     function buildWhatsappMessage(clientName, phone, date, time, service, notes) {
         const details = [
-            `*📩 Nueva cita - Barber Shop Delia*`,
+            `*📩 Nueva cita - Estética Delia*`,
             `👤 Nombre: ${clientName}`,
             `📞 Teléfono: ${phone}`,
             `💈 Servicio: ${service}`,
@@ -114,6 +124,10 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (error) {
             showError("No se pudo copiar el enlace. Usa Ctrl+C y pega el enlace manualmente.");
         }
+    });
+
+    clearBookingsButton.addEventListener("click", function () {
+        clearBookedSlots();
     });
 
     form.addEventListener("submit", function (event) {
