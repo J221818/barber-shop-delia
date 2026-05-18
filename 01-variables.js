@@ -3,10 +3,24 @@ document.addEventListener("DOMContentLoaded", function () {
     const confirmation = document.getElementById("confirmation");
     const errorBox = document.getElementById("form-error");
     const whatsappLink = document.getElementById("whatsapp-link");
+    const occupiedList = document.getElementById("occupied-list");
+    const qrCode = document.getElementById("qr-code");
+    const shareUrlInput = document.getElementById("share-url");
+    const copyLinkButton = document.getElementById("copy-link-button");
 
-    if (!form || !confirmation || !errorBox || !whatsappLink) {
+    const pageUrl = window.location.href;
+    const whatsappNumber = "526643593040";
+    const storageKey = "barberShopDeliaBookedSlots";
+
+    if (!form || !confirmation || !errorBox || !whatsappLink || !occupiedList || !qrCode || !shareUrlInput || !copyLinkButton) {
         return;
     }
+
+    shareUrlInput.value = pageUrl;
+    qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(pageUrl)}`;
+
+    let bookedSlots = loadBookedSlots();
+    renderBookedSlots();
 
     function showError(message) {
         errorBox.textContent = message;
@@ -38,6 +52,70 @@ document.addEventListener("DOMContentLoaded", function () {
         return hours >= 9 && (hours < 20 || (hours === 20 && minutes === 0));
     }
 
+    function formatSlotText(slot) {
+        return `${slot.date} • ${slot.time} • ${slot.service} (${slot.clientName})`;
+    }
+
+    function getSlotKey(date, time) {
+        return `${date}|${time}`;
+    }
+
+    function loadBookedSlots() {
+        const saved = localStorage.getItem(storageKey);
+        return saved ? JSON.parse(saved) : [];
+    }
+
+    function saveBookedSlots() {
+        localStorage.setItem(storageKey, JSON.stringify(bookedSlots));
+    }
+
+    function renderBookedSlots() {
+        occupiedList.innerHTML = "";
+
+        if (bookedSlots.length === 0) {
+            const emptyItem = document.createElement("li");
+            emptyItem.textContent = "No hay citas reservadas aún.";
+            occupiedList.appendChild(emptyItem);
+            return;
+        }
+
+        bookedSlots.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+        bookedSlots.forEach(slot => {
+            const item = document.createElement("li");
+            item.textContent = formatSlotText(slot);
+            occupiedList.appendChild(item);
+        });
+    }
+
+    function isSlotTaken(date, time) {
+        return bookedSlots.some(slot => slot.key === getSlotKey(date, time));
+    }
+
+    function buildWhatsappMessage(clientName, phone, date, time, service, notes) {
+        const details = [
+            `*📩 Nueva cita - Barber Shop Delia*`,
+            `👤 Nombre: ${clientName}`,
+            `📞 Teléfono: ${phone}`,
+            `💈 Servicio: ${service}`,
+            `📅 Fecha: ${date}`,
+            `⏰ Hora: ${time}`,
+            `📝 Notas: ${notes || 'Ninguna'}`
+        ];
+        return encodeURIComponent(details.join("\n"));
+    }
+
+    copyLinkButton.addEventListener("click", async function () {
+        try {
+            await navigator.clipboard.writeText(pageUrl);
+            copyLinkButton.textContent = "Enlace copiado";
+            setTimeout(() => {
+                copyLinkButton.textContent = "Copiar enlace";
+            }, 2000);
+        } catch (error) {
+            showError("No se pudo copiar el enlace. Usa Ctrl+C y pega el enlace manualmente.");
+        }
+    });
+
     form.addEventListener("submit", function (event) {
         event.preventDefault();
         hideError();
@@ -50,7 +128,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const notes = document.getElementById("notes").value.trim();
 
         if (!clientName) {
-            showError("Ingresa tu nombre completo para que podamos agendar tu cita.");
+            showError("Ingresa tu nombre completo para poder agendar la cita.");
             return;
         }
 
@@ -74,23 +152,32 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        const confirmationText = `¡Gracias, ${clientName}! Tu cita para ${service} ha sido registrada para el ${date} a las ${time}. Te contactaremos al ${phone}.`;
-        confirmation.textContent = confirmationText;
-        confirmation.style.display = "block";
+        if (isSlotTaken(date, time)) {
+            showError(`Ya hay una cita ocupando ${date} a las ${time}. Elige otro horario.`);
+            return;
+        }
 
-        const bookingMessage = `Nueva cita en Barber Shop Delia%0ANombre: ${encodeURIComponent(clientName)}%0ATeléfono: ${encodeURIComponent(phone)}%0AServicio: ${encodeURIComponent(service)}%0AFecha: ${encodeURIComponent(date)}%0AHora: ${encodeURIComponent(time)}%0ANotas: ${encodeURIComponent(notes || 'Ninguna')}`;
-        const whatsappNumber = "526643593040";
-        whatsappLink.href = `https://wa.me/${whatsappNumber}?text=${bookingMessage}`;
-        whatsappLink.style.display = "inline-flex";
-
-        console.log({
+        const newSlot = {
+            key: getSlotKey(date, time),
             clientName,
             phone,
             date,
             time,
             service,
             notes,
-        });
+            createdAt: new Date().toISOString()
+        };
+
+        bookedSlots.push(newSlot);
+        saveBookedSlots();
+        renderBookedSlots();
+
+        confirmation.textContent = `✅ ¡Listo, ${clientName}! Tu cita para ${service} quedó reservada el ${date} a las ${time}.`;
+        confirmation.style.display = "block";
+
+        const bookingMessage = buildWhatsappMessage(clientName, phone, date, time, service, notes);
+        whatsappLink.href = `https://wa.me/${whatsappNumber}?text=${bookingMessage}`;
+        whatsappLink.style.display = "inline-flex";
 
         form.reset();
     });
