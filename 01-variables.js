@@ -25,8 +25,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const pageUrl = window.location.href;
     const whatsappNumber = "529181520732";
-    const storageKey = "barberShopDeliaBookedSlots";
-    const adminPassword_correct = "admin123";
+    const API_BASE = 'http://localhost:3000';
 
     if (!form || !confirmation || !errorBox || !whatsappLink || !occupiedList || !qrCode || !shareUrlInput || !copyLinkButton) {
         return;
@@ -35,9 +34,23 @@ document.addEventListener("DOMContentLoaded", function () {
     shareUrlInput.value = pageUrl;
     qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(pageUrl)}`;
 
-    let bookedSlots = loadBookedSlots();
-    removeExpiredSlots();
-    renderBookedSlots();
+    // in-memory cache of fetched slots
+    let bookedSlots = [];
+    let adminToken = sessionStorage.getItem('adminToken') || null;
+
+    // initialize: load bookings from server
+    (async function init() {
+        try {
+            bookedSlots = await fetchBookedSlots();
+            renderBookedSlots();
+        } catch (err) {
+            console.warn('No server available, falling back to localStorage');
+            // fallback to localStorage if server not reachable
+            const saved = localStorage.getItem('barberShopDeliaBookedSlots');
+            bookedSlots = saved ? JSON.parse(saved) : [];
+            renderBookedSlots();
+        }
+    })();
 
     function showError(message) {
         errorBox.textContent = message;
@@ -77,19 +90,29 @@ document.addEventListener("DOMContentLoaded", function () {
         return `${date}|${time}`;
     }
 
-    function loadBookedSlots() {
-        const saved = localStorage.getItem(storageKey);
-        return saved ? JSON.parse(saved) : [];
+    async function fetchBookedSlots(date) {
+        const q = date ? `?date=${encodeURIComponent(date)}` : '';
+        const res = await fetch(`${API_BASE}/api/occupied${q}`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        return await res.json();
     }
 
-    function saveBookedSlots() {
-        localStorage.setItem(storageKey, JSON.stringify(bookedSlots));
+    async function createAppointmentOnServer(slot) {
+        const res = await fetch(`${API_BASE}/api/appointments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(slot)
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.error || 'Error creating appointment');
+        }
+        return await res.json();
     }
 
     function renderBookedSlots() {
         occupiedList.innerHTML = "";
-
-        if (bookedSlots.length === 0) {
+        if (!bookedSlots || bookedSlots.length === 0) {
             const emptyItem = document.createElement("li");
             emptyItem.textContent = "No hay citas reservadas aún.";
             occupiedList.appendChild(emptyItem);
@@ -110,7 +133,6 @@ document.addEventListener("DOMContentLoaded", function () {
             const slotDate = new Date(slot.date + "T" + slot.time + ":00");
             return slotDate >= now;
         });
-        saveBookedSlots();
     }
 
     function isSlotTaken(date, time) {
@@ -194,9 +216,18 @@ document.addEventListener("DOMContentLoaded", function () {
             createdAt: new Date().toISOString()
         };
 
-        bookedSlots.push(newSlot);
-        saveBookedSlots();
-        renderBookedSlots();
+        try {
+            const created = await createAppointmentOnServer(newSlot);
+            bookedSlots.push(created);
+            removeExpiredSlots();
+            renderBookedSlots();
+        } catch (err) {
+            // fallback: try saving locally
+            showError(err.message || 'No se pudo conectar al servidor. Intentando guardar localmente.');
+            bookedSlots.push(newSlot);
+            localStorage.setItem('barberShopDeliaBookedSlots', JSON.stringify(bookedSlots));
+            renderBookedSlots();
+        }
 
         confirmation.textContent = `✅ ¡Listo, ${clientName}! Tu cita para ${service} quedó reservada el ${date} a las ${time}. Se abrirá WhatsApp para confirmar la cita.`;
         confirmation.style.display = "block";
@@ -233,21 +264,30 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    adminLogin.addEventListener("click", function () {
-        if (adminPassword.value === adminPassword_correct) {
+    adminLogin.addEventListener("click", async function () {
+        const pwd = adminPassword.value || '';
+        try {
+            const res = await fetch(`${API_BASE}/api/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pwd })
+            });
+            if (!res.ok) throw new Error('Contraseña incorrecta');
+            const body = await res.json();
+            adminToken = body.token;
+            sessionStorage.setItem('adminToken', adminToken);
             loginSection.style.display = "none";
             dashboardSection.style.display = "block";
             if (adminDateFilter) {
-                // set default date to today if empty
                 const today = new Date();
                 const iso = today.toISOString().slice(0, 10);
                 if (!adminDateFilter.value) adminDateFilter.value = iso;
-                loadAdminDashboard(adminDateFilter.value);
+                await loadAdminDashboard(adminDateFilter.value);
             } else {
-                loadAdminDashboard();
+                await loadAdminDashboard();
             }
-        } else {
-            alert("Contraseña incorrecta");
+        } catch (err) {
+            alert(err.message || 'Error en login');
             adminPassword.value = "";
             adminPassword.focus();
         }
@@ -266,62 +306,73 @@ document.addEventListener("DOMContentLoaded", function () {
         adminPassword.focus();
     });
 
-    function loadAdminDashboard() {
-        const currentBookedSlots = loadBookedSlots();
-        // Filter by selected date if provided
-        let filterDate = null;
-        if (adminDateFilter && adminDateFilter.value) filterDate = adminDateFilter.value;
-
-        let filtered = currentBookedSlots;
-        if (filterDate) {
-            filtered = currentBookedSlots.filter(s => s.date === filterDate);
-        }
-
-        totalAppointments.textContent = filtered.length;
-
-        appointmentsBody.innerHTML = "";
-
-        if (filtered.length === 0) {
-            const row = document.createElement("tr");
-            row.innerHTML = '<td colspan="7" style="text-align: center; color: #94a3b8;">No hay citas para la fecha seleccionada.</td>';
-            appointmentsBody.appendChild(row);
-            return;
-        }
-
-        filtered.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
-
-        filtered.forEach((slot) => {
-            const row = document.createElement("tr");
-            // escape values basic
-            const notes = slot.notes ? slot.notes : '-';
-            row.innerHTML = `\n                <td>${slot.clientName}</td>\n                <td>${slot.phone}</td>\n                <td>${slot.date}</td>\n                <td>${slot.time}</td>\n                <td>${slot.service}</td>\n                <td>${notes}</td>\n                <td><button class="delete-btn" data-key="${slot.key}">Eliminar</button></td>\n            `;
-            const delBtn = row.querySelector('.delete-btn');
-            delBtn.addEventListener('click', function () {
-                deleteAppointmentByKey(slot.key);
+    async function loadAdminDashboard(date) {
+        try {
+            const q = date ? `?date=${encodeURIComponent(date)}` : '';
+            const res = await fetch(`${API_BASE}/api/appointments${q}`, {
+                headers: { 'x-admin-token': adminToken }
             });
-            appointmentsBody.appendChild(row);
-        });
+            if (!res.ok) throw new Error('No autorizado o error del servidor');
+            const rows = await res.json();
+            const filtered = rows || [];
+            totalAppointments.textContent = filtered.length;
+            appointmentsBody.innerHTML = "";
+            if (filtered.length === 0) {
+                const row = document.createElement("tr");
+                row.innerHTML = '<td colspan="7" style="text-align: center; color: #94a3b8;">No hay citas para la fecha seleccionada.</td>';
+                appointmentsBody.appendChild(row);
+                return;
+            }
+            filtered.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+            filtered.forEach((slot) => {
+                const row = document.createElement("tr");
+                const notes = slot.notes ? slot.notes : '-';
+                row.innerHTML = `\n                <td>${slot.clientName}</td>\n                <td>${slot.phone}</td>\n                <td>${slot.date}</td>\n                <td>${slot.time}</td>\n                <td>${slot.service}</td>\n                <td>${notes}</td>\n                <td><button class="delete-btn" data-id="${slot.id}">Eliminar</button></td>\n            `;
+                const delBtn = row.querySelector('.delete-btn');
+                delBtn.addEventListener('click', function () {
+                    deleteAppointmentById(slot.id);
+                });
+                appointmentsBody.appendChild(row);
+            });
+        } catch (err) {
+            alert(err.message || 'Error cargando citas');
+        }
     }
 
-    function deleteAppointmentByKey(key) {
+    async function deleteAppointmentById(id) {
         if (!confirm("¿Estás seguro de que deseas eliminar esta cita?")) return;
-        let all = loadBookedSlots();
-        const remaining = all.filter(s => s.key !== key);
-        localStorage.setItem(storageKey, JSON.stringify(remaining));
-        // update in-memory and UI
-        bookedSlots = remaining;
-        renderBookedSlots();
-        loadAdminDashboard();
+        try {
+            const res = await fetch(`${API_BASE}/api/appointments/${encodeURIComponent(id)}`, {
+                method: 'DELETE',
+                headers: { 'x-admin-token': adminToken }
+            });
+            if (!res.ok) throw new Error('No se pudo eliminar');
+            // refresh lists
+            bookedSlots = await fetchBookedSlots();
+            removeExpiredSlots();
+            renderBookedSlots();
+            await loadAdminDashboard(adminDateFilter ? adminDateFilter.value : undefined);
+        } catch (err) {
+            alert(err.message || 'Error al eliminar');
+        }
     }
 
-    clearAllBtn.addEventListener("click", function () {
+    clearAllBtn.addEventListener("click", async function () {
         if (confirm("⚠️ ¿ESTÁS SEGURO? Esto eliminará TODAS las citas. Esta acción no se puede deshacer.")) {
             if (confirm("Confirma nuevamente: ¿Deseas eliminar TODAS las citas?")) {
-                localStorage.setItem(storageKey, JSON.stringify([]));
-                bookedSlots = [];
-                renderBookedSlots();
-                loadAdminDashboard();
-                alert("✅ Todas las citas han sido eliminadas.");
+                try {
+                    const res = await fetch(`${API_BASE}/api/appointments`, {
+                        method: 'DELETE',
+                        headers: { 'x-admin-token': adminToken }
+                    });
+                    if (!res.ok) throw new Error('No se pudo eliminar todo');
+                    bookedSlots = [];
+                    renderBookedSlots();
+                    await loadAdminDashboard();
+                    alert("✅ Todas las citas han sido eliminadas.");
+                } catch (err) {
+                    alert(err.message || 'Error al eliminar todo');
+                }
             }
         }
     });
