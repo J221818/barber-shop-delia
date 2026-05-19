@@ -20,6 +20,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const totalAppointments = document.getElementById("total-appointments");
     const clearAllBtn = document.getElementById("clear-all-btn");
     const logoutBtn = document.getElementById("logout-btn");
+    const adminDateFilter = document.getElementById("admin-date-filter");
+    const adminRefresh = document.getElementById("admin-refresh");
 
     const pageUrl = window.location.href;
     const whatsappNumber = "529181520732";
@@ -235,7 +237,15 @@ document.addEventListener("DOMContentLoaded", function () {
         if (adminPassword.value === adminPassword_correct) {
             loginSection.style.display = "none";
             dashboardSection.style.display = "block";
-            loadAdminDashboard();
+            if (adminDateFilter) {
+                // set default date to today if empty
+                const today = new Date();
+                const iso = today.toISOString().slice(0, 10);
+                if (!adminDateFilter.value) adminDateFilter.value = iso;
+                loadAdminDashboard(adminDateFilter.value);
+            } else {
+                loadAdminDashboard();
+            }
         } else {
             alert("Contraseña incorrecta");
             adminPassword.value = "";
@@ -258,44 +268,51 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function loadAdminDashboard() {
         const currentBookedSlots = loadBookedSlots();
-        totalAppointments.textContent = currentBookedSlots.length;
+        // Filter by selected date if provided
+        let filterDate = null;
+        if (adminDateFilter && adminDateFilter.value) filterDate = adminDateFilter.value;
+
+        let filtered = currentBookedSlots;
+        if (filterDate) {
+            filtered = currentBookedSlots.filter(s => s.date === filterDate);
+        }
+
+        totalAppointments.textContent = filtered.length;
 
         appointmentsBody.innerHTML = "";
 
-        if (currentBookedSlots.length === 0) {
+        if (filtered.length === 0) {
             const row = document.createElement("tr");
-            row.innerHTML = '<td colspan="7" style="text-align: center; color: #94a3b8;">No hay citas registradas.</td>';
+            row.innerHTML = '<td colspan="7" style="text-align: center; color: #94a3b8;">No hay citas para la fecha seleccionada.</td>';
             appointmentsBody.appendChild(row);
             return;
         }
 
-        currentBookedSlots.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+        filtered.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
 
-        currentBookedSlots.forEach((slot, index) => {
+        filtered.forEach((slot) => {
             const row = document.createElement("tr");
-            row.innerHTML = `
-                <td>${slot.clientName}</td>
-                <td>${slot.phone}</td>
-                <td>${slot.date}</td>
-                <td>${slot.time}</td>
-                <td>${slot.service}</td>
-                <td>${slot.notes || '-'}</td>
-                <td><button class="delete-btn" onclick="deleteAppointment(${index})">Eliminar</button></td>
-            `;
+            // escape values basic
+            const notes = slot.notes ? slot.notes : '-';
+            row.innerHTML = `\n                <td>${slot.clientName}</td>\n                <td>${slot.phone}</td>\n                <td>${slot.date}</td>\n                <td>${slot.time}</td>\n                <td>${slot.service}</td>\n                <td>${notes}</td>\n                <td><button class="delete-btn" data-key="${slot.key}">Eliminar</button></td>\n            `;
+            const delBtn = row.querySelector('.delete-btn');
+            delBtn.addEventListener('click', function () {
+                deleteAppointmentByKey(slot.key);
+            });
             appointmentsBody.appendChild(row);
         });
     }
 
-    window.deleteAppointment = function (index) {
-        if (confirm("¿Estás seguro de que deseas eliminar esta cita?")) {
-            let currentBookedSlots = loadBookedSlots();
-            currentBookedSlots.splice(index, 1);
-            saveBookedSlots.call({ bookedSlots: currentBookedSlots });
-            localStorage.setItem(storageKey, JSON.stringify(currentBookedSlots));
-            renderBookedSlots();
-            loadAdminDashboard();
-        }
-    };
+    function deleteAppointmentByKey(key) {
+        if (!confirm("¿Estás seguro de que deseas eliminar esta cita?")) return;
+        let all = loadBookedSlots();
+        const remaining = all.filter(s => s.key !== key);
+        localStorage.setItem(storageKey, JSON.stringify(remaining));
+        // update in-memory and UI
+        bookedSlots = remaining;
+        renderBookedSlots();
+        loadAdminDashboard();
+    }
 
     clearAllBtn.addEventListener("click", function () {
         if (confirm("⚠️ ¿ESTÁS SEGURO? Esto eliminará TODAS las citas. Esta acción no se puede deshacer.")) {
@@ -308,4 +325,24 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
     });
+
+    // Keyboard shortcut: Ctrl+Shift+A opens admin modal (discreet access)
+    document.addEventListener('keydown', function (e) {
+        if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+            adminModal.classList.add('active');
+            adminPassword.focus();
+        }
+    });
+
+    // Refresh button and date change
+    if (adminRefresh) {
+        adminRefresh.addEventListener('click', function () {
+            loadAdminDashboard();
+        });
+    }
+    if (adminDateFilter) {
+        adminDateFilter.addEventListener('change', function () {
+            loadAdminDashboard();
+        });
+    }
 });
