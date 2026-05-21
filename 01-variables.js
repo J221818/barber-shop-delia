@@ -141,13 +141,20 @@ document.addEventListener("DOMContentLoaded", function () {
         adminModal.classList.remove("active");
     }
 
+    function deleteSlot(key) {
+        bookedSlots = bookedSlots.filter(slot => slot.key !== key);
+        saveBookedSlots();
+        renderBookedSlots();
+        renderAdminSlots();
+    }
+
     function renderAdminSlots() {
         adminSlotsBody.innerHTML = "";
 
         if (bookedSlots.length === 0) {
             adminSlotsBody.innerHTML = `
                 <tr>
-                    <td colspan="6">No hay citas registradas aún.</td>
+                    <td colspan="7">No hay citas registradas aún.</td>
                 </tr>
             `;
             adminStats.textContent = "No hay citas activas para mostrar.";
@@ -164,7 +171,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 <td>${slot.phone}</td>
                 <td>${slot.service}</td>
                 <td>${slot.notes || 'Ninguna'}</td>
+                <td></td>
             `;
+            const actionCell = row.querySelector('td:last-child');
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-btn';
+            deleteButton.type = 'button';
+            deleteButton.textContent = 'Eliminar';
+            deleteButton.addEventListener('click', () => deleteSlot(slot.key));
+            actionCell.appendChild(deleteButton);
             adminSlotsBody.appendChild(row);
         });
 
@@ -294,11 +309,10 @@ document.addEventListener("DOMContentLoaded", function () {
         form.reset();
     });
 
-    // Keyboard shortcut: Ctrl+Shift+A opens admin modal (discreet access)
+    // Keyboard shortcut: Ctrl+Shift+A opens admin modal for the owner
     document.addEventListener('keydown', function (e) {
         if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-            // original behavior had no admin modal; keep no-op or simple alert
-            alert('Acceso administrador no disponible en la versión local');
+            openAdminModal();
         }
     });
 });
